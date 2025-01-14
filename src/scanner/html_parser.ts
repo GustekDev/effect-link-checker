@@ -14,11 +14,12 @@ export function findLinks(html: string, baseUrl: string): Either.Either<Links, P
 
   const internal = new UrlSet()
   const external = new UrlSet()
+  
   for (const href of hrefs) {
     if (href.startsWith(baseUrl)) {
       internal.add(new URL(href))
     } else if (href.startsWith("//")) {
-      external.add(new URL(href))
+      external.add(new URL(`https:${href}`))
     } else if (href.startsWith("/")) {
       internal.add(new URL(`${baseUrl}${href}`))
     } else if (href.startsWith("http://") || href.startsWith("https://")) {

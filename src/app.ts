@@ -1,18 +1,30 @@
-// Import necessary modules from the libraries
-import { Command } from "@effect/cli"
+import { Args } from "@effect/cli"
+import * as Command from "@effect/cli/Command"
+import { Console, Effect, Logger, LogLevel } from "effect"
+import { inspectPage } from "./scanner/link_checker.js"
+import { PageCrawler, PageCrawlerLive } from "./scanner/page_crawler.js"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
-import { Console, Effect } from "effect"
 
-// Define the top-level command
-const command = Command.make("hello-world", {}, () =>
-  Console.log("Hello World")
-)
+// Define a text argument
+const url = Args.text({ name: "url" })
 
-// Set up the CLI application
-const cli = Command.run(command, {
-  name: "Hello World CLI",
-  version: "v1.0.0"
+// Create a command that logs the provided text argument to the console
+const command = Command.make("link-scanner", { url }, ({ url }) => {
+  return Effect.gen(function*() {
+    const result = yield* inspectPage(new URL(url))
+    for (const [pageUrl, statusCode] of result) {
+      yield* Console.log(`${pageUrl}: ${statusCode}`)
+    }
+  }).pipe(Logger.withMinimumLogLevel(LogLevel.Debug))
 })
 
-// Prepare and run the CLI application
-cli(process.argv).pipe(Effect.provide(NodeContext.layer), NodeRuntime.runMain)
+export const run = Command.run(command, {
+  name: "Link Scanner CLI",
+  version: "v0.0.1"
+})
+
+run(process.argv).pipe(
+  Effect.provideService(PageCrawler, PageCrawlerLive),
+  Effect.provide(NodeContext.layer),
+  NodeRuntime.runMain()
+)
