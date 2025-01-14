@@ -30,7 +30,7 @@ function extractLinks(
 
 export function inspectPage(
   startUrl: URL
-): Effect.Effect<UrlMap<Status>, UnknownException | ParsingError, PageCrawler> {
+): Effect.Effect<UrlMap<Status>, never, PageCrawler> {
   return Effect.gen(function*() {
     const todoQueue = yield* Queue.unbounded<URL>()
     yield* todoQueue.offer(startUrl)
