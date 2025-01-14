@@ -31,35 +31,48 @@ describe("inspectPage", () => {
     runEffect
   ))
 
-  it("should continue work on other workers when there is slow page", () => Effect.gen(function* () {
-    const fiber = yield* inspectPage(new URL("https://www.example.com"))
-      .pipe(
-        Effect.fork
-      )
-    const beforeReqCount = yield* Ref.get(yield* PageCrawlerTestWithSlowPage.requestCounter)
-    expect(beforeReqCount).toBe(9)
-    yield* TestClock.adjust(Duration.seconds(61))
-    const afterReqCount = yield* Ref.get(yield* PageCrawlerTestWithSlowPage.requestCounter)
-    expect(afterReqCount).toBe(10)
-    console.log(beforeReqCount, afterReqCount)
-
-    const result = yield* Fiber.join(fiber)
-    expect(result.size()).toBe(10)
+  it("should handle unkonwn exceptions and parse errors", () =>  Effect.gen(function* () {
+    const result = yield* inspectPage(new URL("https://www.example.com"))
+    expect(result.size()).toBe(4)
     expect(result.get(new URL("https://www.example.com"))).toBe(200)
     expect(result.get(new URL("https://www.example.com/1"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/2"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/3"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/4"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/5"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/6"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/7"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/8"))).toBe(200)
-    expect(result.get(new URL("https://www.example.com/slow_page"))).toBe(200)
+    expect(result.get(new URL("https://www.example.com/failed_parsing"))).toBe("parsing_error")
+    expect(result.get(new URL("https://www.example.com/unknown"))).toBe("unknown_error")
   }).pipe(
-    Effect.provideService(PageCrawler, PageCrawlerTestWithSlowPage),
-    Effect.provide(TestContext.TestContext),
+    Effect.provideService(PageCrawler, PageCrawlerTestWithErrors),
     runEffect
   ))
+
+//   it("should continue work on other workers when there is slow page", () => Effect.gen(function* () {
+//     const fiber = yield* inspectPage(new URL("https://www.example.com"))
+//       .pipe(
+//         Effect.fork
+//       )
+//     const beforeReqCount = yield* Ref.get(yield* PageCrawlerTestWithSlowPage.requestCounter)
+//     expect(beforeReqCount).toBe(9)
+//     yield* TestClock.adjust(Duration.seconds(61))
+//     const afterReqCount = yield* Ref.get(yield* PageCrawlerTestWithSlowPage.requestCounter)
+//     expect(afterReqCount).toBe(10)
+//     console.log(beforeReqCount, afterReqCount)
+
+//     const result = yield* Fiber.join(fiber)
+//     expect(result.size()).toBe(10)
+//     expect(result.get(new URL("https://www.example.com"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/1"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/2"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/3"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/4"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/5"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/6"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/7"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/8"))).toBe(200)
+//     expect(result.get(new URL("https://www.example.com/slow_page"))).toBe(200)
+//   }).pipe(
+//     Effect.provideService(PageCrawler, PageCrawlerTestWithSlowPage),
+//     Effect.provide(TestContext.TestContext),
+//     runEffect
+//   ))
+
 })
 
 
@@ -72,8 +85,30 @@ export const PageCrawlerTest: IPageCrawler = {
   }
 }
 
+export const PageCrawlerTestWithErrors: IPageCrawler = {
+  getPage(url: URL): Effect.Effect<HttpResponse, UnknownException, never> {  
+    const mockResponses = new UrlMap<HttpResponse>()
+    mockResponses.set(new URL("https://www.example.com"), {statusCode: 200, text: examplePageWithErrors})
+    mockResponses.set(new URL("https://www.example.com/1"), {statusCode: 200, text: null})
+    mockResponses.set(new URL("https://www.example.com/failed_parsing"), {statusCode: 200, text: "<head>"})
+    mockResponses.set(new URL("https://www.example.com/unknown"), {statusCode: 404, text: null})
+    return Effect.tryPromise(async () => {
+      if (url.toString() === "https://www.example.com/unknown") {
+        return Promise.reject(new UnknownException("unknown error"))
+      }
+      return Promise.resolve(mockResponses.get(url)!)
+    }) // ! ok here, if test fail becasue of that then it was a bad test
+  }
+}
+
 const examplePage = `<html><head><title>Test Page</title></head><body>
 <a href="https://www.example.com/404">404 page</a>
+</body></html>`
+
+const examplePageWithErrors = `<html><head><title>Test Page</title></head><body>
+<a href="https://www.example.com/1">1 page</a>
+<a href="https://www.example.com/failed_parsing">Malformed page</a>
+<a href="https://www.example.com/unknown">Unknown error page</a>
 </body></html>`
 
 

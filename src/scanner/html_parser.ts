@@ -38,6 +38,7 @@ export interface Links {
 }
 
 export class ParsingError {
+  _tag = "parsing_error"
   message: string
   constructor(message: string) {
     this.message = message

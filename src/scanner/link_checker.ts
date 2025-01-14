@@ -30,7 +30,7 @@ function extractLinks(
 
 export function inspectPage(
   startUrl: URL
-): Effect.Effect<UrlMap<number>, UnknownException | ParsingError, PageCrawler> {
+): Effect.Effect<UrlMap<Status>, UnknownException | ParsingError, PageCrawler> {
   return Effect.gen(function*() {
     const todoQueue = yield* Queue.unbounded<URL>()
     yield* todoQueue.offer(startUrl)
@@ -42,23 +42,33 @@ export function inspectPage(
       worker(seen, todoQueue),
       worker(seen, todoQueue)
     ], { concurrency: "unbounded" })
-    return result.reduce((acc, curr) => acc.merge(curr), new UrlMap<number>())
+    return result.reduce((acc, curr) => acc.merge(curr), new UrlMap<Status>())
   })
 }
 
 function worker(seen: UrlSet, todoQueue: Queue.Queue<URL>) {
   return Effect.gen(function*() {
-    const visited = new UrlMap<number>()
+    const visited = new UrlMap<Status>()
     let maybeLink = yield* Queue.poll(todoQueue)
     while (Option.isSome(maybeLink)) {
       const link = maybeLink.value
-      const extractedLinks = yield* extractLinks(link)
-      // TODO recover from UnknownException | ParsingError
-      visited.set(link, extractedLinks.statusCode)
-      for (const l of extractedLinks.links.internal) {
-        if (!seen.has(l)) {
-          seen.add(l)
-          yield* todoQueue.offer(new URL(l))
+      const extractedLinks = yield* extractLinks(link).pipe(
+        Effect.catchAll((err) => {
+          if (err._tag === "parsing_error") {
+            return Effect.succeed<"parsing_error" | "unknown_error">("parsing_error")
+          }
+          return Effect.succeed<"parsing_error" | "unknown_error">("unknown_error")
+        })
+      )
+      if (typeof extractedLinks === "string") {
+        visited.set(link, extractedLinks)
+      } else {
+        visited.set(link, extractedLinks.statusCode)
+        for (const l of extractedLinks.links.internal) {
+          if (!seen.has(l)) {
+            seen.add(l)
+            yield* todoQueue.offer(new URL(l))
+          }
         }
       }
       maybeLink = yield* Queue.poll(todoQueue)
@@ -71,3 +81,5 @@ interface ExtractResult {
   statusCode: number
   links: Links
 }
+
+type Status = number | "parsing_error" | "unknown_error"
