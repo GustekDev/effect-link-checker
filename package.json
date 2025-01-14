@@ -1,0 +1,20 @@
+{
+  "name": "effect-link-checker-scratch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@effect/cli": "^0.51.2",
+    "@effect/platform-node": "^0.68.2",
+    "@effect/vitest": "^0.16.2",
+    "@types/node": "^22.10.6",
+    "effect": "^3.12.2",
+    "vitest": "^2.1.8"
+  }
+}
