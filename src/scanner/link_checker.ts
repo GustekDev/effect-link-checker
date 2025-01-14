@@ -53,6 +53,7 @@ function worker(seen: UrlSet, todoQueue: Queue.Queue<URL>) {
     while (Option.isSome(maybeLink)) {
       const link = maybeLink.value
       const extractedLinks = yield* extractLinks(link)
+      // TODO recover from UnknownException | ParsingError
       visited.set(link, extractedLinks.statusCode)
       for (const l of extractedLinks.links.internal) {
         if (!seen.has(l)) {
